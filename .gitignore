@@ -1,0 +1,38 @@
+# Gradle
+.gradle/
+**/build/
+
+# Android / Kotlin
+local.properties
+.android-sdk/
+*.apk
+*.iml
+.kotlin/
+.externalNativeBuild/
+.cxx/   # NDK / CMake
+
+# IDE (Android Studio / IntelliJ)
+.idea/
+
+# Captures, lint outputs
+captures/
+**/lint/intermediates/
+**/lint/reports/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Signing — никогда не коммитить
+*.jks
+*.keystore
+*.pem
+
+# Fastlane (если появится)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
