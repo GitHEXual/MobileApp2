@@ -37,7 +37,8 @@ data class AppStrings(
     val detailedInformation: String,
     val sevenDayForecast: String,
     val version: String,
-    val updated: String
+    val updated: String,
+    val offlineWeatherHint: String
 )
 
 val stringsRu = AppStrings(
@@ -71,13 +72,14 @@ val stringsRu = AppStrings(
     light = "Светлая",
     dark = "Тёмная",
     about = "О приложении",
-    weatherData = "Данные погоды — OpenWeather API",
+    weatherData = "Данные погоды — Open-Meteo",
     openDetails = "Перейти в детали",
     noFavorites = "Нет избранных городов",
     detailedInformation = "Подробная информация",
     sevenDayForecast = "7-дневный прогноз",
     version = "Версия: 1.0.0",
-    updated = "Обновлено: 19.02.2026"
+    updated = "Обновлено: 19.02.2026",
+    offlineWeatherHint = "Нет сети — показаны данные без обновления"
 )
 
 val stringsEn = AppStrings(
@@ -111,13 +113,14 @@ val stringsEn = AppStrings(
     light = "Light",
     dark = "Dark",
     about = "About",
-    weatherData = "Weather data — OpenWeather API",
+    weatherData = "Weather data — Open-Meteo",
     openDetails = "Open details",
     noFavorites = "No favorite cities",
     detailedInformation = "Detailed Information",
     sevenDayForecast = "7-day forecast",
     version = "Version: 1.0.0",
-    updated = "Updated: 19.02.2026"
+    updated = "Updated: 19.02.2026",
+    offlineWeatherHint = "Offline — showing cached placeholder data"
 )
 
 fun strings(language: AppLanguage): AppStrings {

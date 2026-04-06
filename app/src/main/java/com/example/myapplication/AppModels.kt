@@ -52,8 +52,10 @@ data class WeatherAppUiState(
     val theme: AppThemeMode = AppThemeMode.LIGHT,
     val labels: AppStrings = stringsRu,
     val homeCity: CityCatalogItem = WeatherCatalog.homeCity,
-    val cities: List<CityCatalogItem> = WeatherCatalog.cities,
-    val favorites: List<FavoriteCity> = emptyList()
+    val cities: List<CityCatalogItem> = WeatherCatalog.offlineCities(),
+    val favorites: List<FavoriteCity> = emptyList(),
+    val isLoading: Boolean = false,
+    val networkErrorMessage: String? = null
 ) {
     val isDark: Boolean
         get() = theme == AppThemeMode.DARK

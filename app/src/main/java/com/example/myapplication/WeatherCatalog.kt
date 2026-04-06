@@ -1,9 +1,53 @@
 package com.example.myapplication
 
+data class CityPlace(
+    val id: String,
+    val city: String,
+    val cityEn: String,
+    val latitude: Double,
+    val longitude: Double,
+    val mapPosition: MapPosition
+)
+
 object WeatherCatalog {
     const val HOME_CITY_ID = "moscow"
 
-    private val homeForecast = listOf(
+    val places: List<CityPlace> = listOf(
+        CityPlace(
+            id = HOME_CITY_ID,
+            city = "Москва",
+            cityEn = "Moscow",
+            latitude = 55.7558,
+            longitude = 37.6173,
+            mapPosition = MapPosition(0.24f, 0.28f)
+        ),
+        CityPlace(
+            id = "saint-petersburg",
+            city = "Санкт-Петербург",
+            cityEn = "Saint Petersburg",
+            latitude = 59.9343,
+            longitude = 30.3351,
+            mapPosition = MapPosition(0.18f, 0.14f)
+        ),
+        CityPlace(
+            id = "kazan",
+            city = "Казань",
+            cityEn = "Kazan",
+            latitude = 55.7887,
+            longitude = 49.1221,
+            mapPosition = MapPosition(0.47f, 0.34f)
+        ),
+        CityPlace(
+            id = "sochi",
+            city = "Сочи",
+            cityEn = "Sochi",
+            latitude = 43.6028,
+            longitude = 39.7342,
+            mapPosition = MapPosition(0.30f, 0.70f)
+        )
+    )
+
+    private val homeForecastOffline = listOf(
         ForecastDay("Пн", "Mon", "cloud", 3, 7),
         ForecastDay("Вт", "Tue", "cloud-rain", 2, 5),
         ForecastDay("Ср", "Wed", "rain", 1, 4),
@@ -13,7 +57,7 @@ object WeatherCatalog {
         ForecastDay("Вс", "Sun", "cloud-sun", 5, 9)
     )
 
-    val cities = listOf(
+    fun offlineCities(): List<CityCatalogItem> = listOf(
         CityCatalogItem(
             id = HOME_CITY_ID,
             weather = WeatherInfo(
@@ -30,8 +74,8 @@ object WeatherCatalog {
                 sunrise = "07:45",
                 sunset = "17:32"
             ),
-            mapPosition = MapPosition(0.24f, 0.28f),
-            forecast = homeForecast
+            mapPosition = places.first { it.id == HOME_CITY_ID }.mapPosition,
+            forecast = homeForecastOffline
         ),
         CityCatalogItem(
             id = "saint-petersburg",
@@ -49,7 +93,7 @@ object WeatherCatalog {
                 sunrise = "08:15",
                 sunset = "17:10"
             ),
-            mapPosition = MapPosition(0.18f, 0.14f)
+            mapPosition = places.first { it.id == "saint-petersburg" }.mapPosition
         ),
         CityCatalogItem(
             id = "kazan",
@@ -67,7 +111,7 @@ object WeatherCatalog {
                 sunrise = "07:50",
                 sunset = "17:25"
             ),
-            mapPosition = MapPosition(0.47f, 0.34f)
+            mapPosition = places.first { it.id == "kazan" }.mapPosition
         ),
         CityCatalogItem(
             id = "sochi",
@@ -85,14 +129,19 @@ object WeatherCatalog {
                 sunrise = "07:20",
                 sunset = "18:05"
             ),
-            mapPosition = MapPosition(0.30f, 0.70f)
+            mapPosition = places.first { it.id == "sochi" }.mapPosition
         )
     )
 
     val homeCity: CityCatalogItem
-        get() = cities.first { it.id == HOME_CITY_ID }
+        get() = offlineCities().first { it.id == HOME_CITY_ID }
+
+    val cities: List<CityCatalogItem>
+        get() = offlineCities()
 
     fun findCity(cityId: String): CityCatalogItem? {
-        return cities.firstOrNull { it.id == cityId }
+        return offlineCities().firstOrNull { it.id == cityId }
     }
+
+    fun findPlace(cityId: String): CityPlace? = places.firstOrNull { it.id == cityId }
 }

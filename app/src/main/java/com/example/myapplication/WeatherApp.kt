@@ -1,6 +1,8 @@
 package com.example.myapplication
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -8,15 +10,21 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -37,6 +45,15 @@ fun WeatherApp(
     val navController = rememberNavController()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = currentBackStackEntry?.destination
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(state.networkErrorMessage) {
+        val msg = state.networkErrorMessage
+        if (!msg.isNullOrBlank()) {
+            snackbarHostState.showSnackbar(msg)
+            appViewModel.consumeNetworkError()
+        }
+    }
 
     MyApplicationTheme(darkTheme = state.isDark) {
         Surface(
@@ -45,6 +62,7 @@ fun WeatherApp(
         ) {
             Scaffold(
                 containerColor = MaterialTheme.colorScheme.background,
+                snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
                 bottomBar = {
                     if (currentDestination?.route != AppRoutes.DETAIL) {
                         BottomNavigationBar(
@@ -57,11 +75,23 @@ fun WeatherApp(
                     }
                 }
             ) { padding ->
-                NavHost(
-                    navController = navController,
-                    startDestination = AppRoutes.HOME,
-                    modifier = Modifier.padding(padding)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
                 ) {
+                    if (state.isLoading) {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.TopCenter)
+                        )
+                    }
+                    NavHost(
+                        navController = navController,
+                        startDestination = AppRoutes.HOME,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
                     composable(AppRoutes.HOME) {
                         HomeScreen(
                             modifier = Modifier.fillMaxSize(),
@@ -154,6 +184,7 @@ fun WeatherApp(
                             onThemeChange = appViewModel::setTheme
                         )
                     }
+                }
                 }
             }
         }

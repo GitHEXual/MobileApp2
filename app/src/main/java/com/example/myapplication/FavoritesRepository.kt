@@ -1,14 +1,11 @@
 package com.example.myapplication
 
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 
 class FavoritesRepository(
     private val favoriteCityDao: FavoriteCityDao
 ) {
-    val favorites: Flow<List<FavoriteCity>> = favoriteCityDao.getFavoritesFlow().map { entities ->
-        entities.mapNotNull(FavoriteCityEntity::toFavoriteCity)
-    }
+    val favoriteEntities: Flow<List<FavoriteCityEntity>> = favoriteCityDao.getFavoritesFlow()
 
     suspend fun addFavorite(cityId: String, note: String?) {
         favoriteCityDao.insertFavorite(
@@ -33,8 +30,8 @@ fun String?.normalizedNote(): String? {
     return this?.trim()?.takeIf { it.isNotEmpty() }
 }
 
-fun FavoriteCityEntity.toFavoriteCity(): FavoriteCity? {
-    val catalogItem = WeatherCatalog.findCity(cityId) ?: return null
+fun FavoriteCityEntity.toFavoriteCity(cities: List<CityCatalogItem>): FavoriteCity? {
+    val catalogItem = cities.firstOrNull { it.id == cityId } ?: return null
     return FavoriteCity(
         cityId = catalogItem.id,
         weather = catalogItem.weather,

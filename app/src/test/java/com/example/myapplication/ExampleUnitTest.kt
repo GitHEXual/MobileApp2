@@ -21,10 +21,11 @@ class ExampleUnitTest {
             createdAt = 123L
         )
 
-        val favorite = entity.toFavoriteCity()
+        val cities = WeatherCatalog.offlineCities()
+        val favorite = entity.toFavoriteCity(cities)
 
         assertNotNull(favorite)
-        assertEquals(WeatherCatalog.findCity("kazan")?.mapPosition, favorite?.mapPosition)
+        assertEquals(cities.firstOrNull { it.id == "kazan" }?.mapPosition, favorite?.mapPosition)
         assertEquals("memo", favorite?.note)
     }
 }
