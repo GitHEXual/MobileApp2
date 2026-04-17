@@ -3,11 +3,9 @@ package com.example.myapplication
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -46,12 +44,11 @@ fun HomeScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .padding(bottom = 20.dp)
+            .padding(horizontal = 16.dp)
+            .padding(top = 8.dp, bottom = 24.dp)
     ) {
         AppCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
+            modifier = Modifier.fillMaxWidth(),
             isDark = isDark,
             padding = PaddingValues(24.dp)
         ) {
@@ -83,15 +80,14 @@ fun HomeScreen(
                 )
                 Spacer(modifier = Modifier.height(20.dp))
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(IntrinsicSize.Min),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlineActionButton(
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxHeight(),
+                            .height(52.dp),
                         text = if (favorite != null) labels.inFavorites else labels.addToFavorites,
                         enabled = favorite == null,
                         onClick = { noteDialogOpen = true },
@@ -100,7 +96,7 @@ fun HomeScreen(
                     PrimaryActionButton(
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxHeight(),
+                            .height(52.dp),
                         text = labels.details,
                         onClick = { onOpenDetail(city.id) }
                     )
@@ -111,15 +107,15 @@ fun HomeScreen(
         Spacer(modifier = Modifier.height(24.dp))
         Text(
             text = labels.sevenDayForecast,
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Medium
         )
         Spacer(modifier = Modifier.height(12.dp))
         Row(
             modifier = Modifier
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             city.forecast.forEach { item ->

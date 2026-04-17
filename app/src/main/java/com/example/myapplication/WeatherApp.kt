@@ -1,8 +1,10 @@
 package com.example.myapplication
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -10,7 +12,6 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -80,17 +81,14 @@ fun WeatherApp(
                         .fillMaxSize()
                         .padding(padding)
                 ) {
-                    if (state.isLoading) {
-                        LinearProgressIndicator(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .align(Alignment.TopCenter)
-                        )
-                    }
                     NavHost(
                         navController = navController,
                         startDestination = AppRoutes.HOME,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        enterTransition = { fadeIn(animationSpec = tween(0)) },
+                        exitTransition = { fadeOut(animationSpec = tween(0)) },
+                        popEnterTransition = { fadeIn(animationSpec = tween(0)) },
+                        popExitTransition = { fadeOut(animationSpec = tween(0)) }
                     ) {
                     composable(AppRoutes.HOME) {
                         HomeScreen(
@@ -147,7 +145,6 @@ fun WeatherApp(
                             },
                             onOpenDetail = { cityId -> navController.navigate(AppRoutes.detail(cityId)) },
                             onDeleteFavorite = appViewModel::deleteFavorite,
-                            onAddToFavorites = appViewModel::addFavorite,
                             onSelectHomeCatalog = appViewModel::setHomeCityCatalog,
                             onSelectHomeCustom = appViewModel::setHomeCityCustom
                         )

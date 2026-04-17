@@ -12,7 +12,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.NoteAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material3.AlertDialog
@@ -101,26 +100,6 @@ fun SettingsScreen(
                     onAdd = onAddMapKey,
                     onRemove = onRemoveMapKey
                 )
-            }
-
-            SettingsSection(title = labels.about, icon = Icons.Default.NoteAlt) {
-                AppCard(isDark = isDark) {
-                    Text(
-                        text = labels.weatherData,
-                        fontSize = 14.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "• ${labels.version}",
-                        fontSize = 12.sp,
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "• ${labels.updated}",
-                        fontSize = 12.sp,
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
             }
         }
     }

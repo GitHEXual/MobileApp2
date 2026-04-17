@@ -49,7 +49,8 @@ data class AppStrings(
     val mapKeysRemove: String,
     val mapKeyNameLabel: String,
     val mapKeyValueLabel: String,
-    val mapKeysStateActive: String
+    val mapKeysStateActive: String,
+    val mapSearchNoResults: String
 )
 
 val stringsRu = AppStrings(
@@ -101,7 +102,8 @@ val stringsRu = AppStrings(
     mapKeysRemove = "Удалить",
     mapKeyNameLabel = "Название",
     mapKeyValueLabel = "Ключ API",
-    mapKeysStateActive = "Активен"
+    mapKeysStateActive = "Активен",
+    mapSearchNoResults = "Ничего не найдено — попробуйте другое название"
 )
 
 val stringsEn = AppStrings(
@@ -153,7 +155,8 @@ val stringsEn = AppStrings(
     mapKeysRemove = "Remove",
     mapKeyNameLabel = "Name",
     mapKeyValueLabel = "API key",
-    mapKeysStateActive = "Active"
+    mapKeysStateActive = "Active",
+    mapSearchNoResults = "Nothing found — try a different name"
 )
 
 fun strings(language: AppLanguage): AppStrings {

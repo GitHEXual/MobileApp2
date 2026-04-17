@@ -1,13 +1,12 @@
 package com.example.myapplication
 
+import android.view.ViewGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -20,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -38,21 +38,29 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.yandex.mapkit.Animation
+import com.yandex.mapkit.GeoObject
+import com.yandex.mapkit.GeoObjectCollection
+import com.yandex.mapkit.MapKitFactory
 import com.yandex.mapkit.geometry.BoundingBox
 import com.yandex.mapkit.geometry.Geometry
 import com.yandex.mapkit.geometry.Point
 import com.yandex.mapkit.map.CameraPosition
 import com.yandex.mapkit.map.MapObjectTapListener
+import com.yandex.mapkit.map.MapType
 import com.yandex.mapkit.mapview.MapView
 import com.yandex.mapkit.search.Response
 import com.yandex.mapkit.search.SearchFactory
+import com.yandex.mapkit.search.SearchManager
 import com.yandex.mapkit.search.SearchManagerType
 import com.yandex.mapkit.search.SearchOptions
 import com.yandex.mapkit.search.SearchType
 import com.yandex.mapkit.search.Session
-import com.yandex.mapkit.GeoObject
-import com.yandex.mapkit.GeoObjectCollection
+import com.yandex.mapkit.search.SuggestItem
+import com.yandex.mapkit.search.SuggestOptions
+import com.yandex.mapkit.search.SuggestResponse
+import com.yandex.mapkit.search.SuggestSession
+import com.yandex.mapkit.search.SuggestType
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -73,41 +81,162 @@ fun MapScreen(
     onBack: () -> Unit,
     onOpenDetail: (String) -> Unit,
     onDeleteFavorite: (String) -> Unit,
-    onAddToFavorites: (String, String?) -> Unit,
     onSelectHomeCatalog: (String) -> Unit,
     onSelectHomeCustom: (Double, Double, String, String) -> Unit
 ) {
     var selectedFavorite by remember { mutableStateOf<FavoriteCity?>(null) }
-    var selectedAvailable by remember { mutableStateOf<CityCatalogItem?>(null) }
+    var mapPickCity by remember { mutableStateOf<CityCatalogItem?>(null) }
     var searchMarker by remember { mutableStateOf<SearchPin?>(null) }
     var searchDialogVisible by remember { mutableStateOf(false) }
+    var searchError by remember { mutableStateOf<String?>(null) }
 
     val favoritesById = remember(favorites) { favorites.associateBy(FavoriteCity::cityId) }
+
+    val searchManager = remember {
+        SearchFactory.getInstance().createSearchManager(SearchManagerType.COMBINED)
+    }
+    val suggestSession = remember(searchManager) { searchManager.createSuggestSession() }
+    var searchSession by remember { mutableStateOf<Session?>(null) }
+    var resolveSession by remember { mutableStateOf<Session?>(null) }
+
+    val scope = rememberCoroutineScope()
 
     Column(modifier = modifier.fillMaxSize()) {
         ScreenTopBar(title = labels.map, onBack = onBack)
         MapSearchBar(
             labels = labels,
-            onSearchResult = { pin ->
-                searchMarker = pin
-                searchDialogVisible = true
+            onSearch = { query ->
+                searchError = null
+                suggestSession.reset()
+                resolveSession?.cancel()
+                searchSession?.cancel()
+                val bbox = BoundingBox(Point(-85.0, -180.0), Point(85.0, 180.0))
+                val suggestOpts = SuggestOptions()
+                    .setSuggestTypes(SuggestType.GEO.value)
+                    .setStrictBounds(false)
+                suggestSession.suggest(
+                    query,
+                    bbox,
+                    suggestOpts,
+                    object : SuggestSession.SuggestListener {
+                        override fun onResponse(response: SuggestResponse) {
+                            scope.launch(Dispatchers.Main) {
+                                val direct = pinFromSuggest(response, query)
+                                if (direct != null) {
+                                    searchMarker = direct
+                                    searchDialogVisible = true
+                                    return@launch
+                                }
+                                val top = response.items.firstOrNull { it.type == SuggestItem.Type.TOPONYM }
+                                    ?: response.items.firstOrNull()
+                                val uri = top?.uri
+                                if (!uri.isNullOrBlank()) {
+                                    val titleHint = top.displayText?.takeIf { it.isNotBlank() }
+                                        ?: top.title?.text?.takeIf { it.isNotBlank() }
+                                        ?: top.searchText?.takeIf { it.isNotBlank() }
+                                        ?: query
+                                    resolveSession = searchManager.resolveURI(
+                                        uri,
+                                        SearchOptions().setSearchTypes(SearchType.GEO.value),
+                                        object : Session.SearchListener {
+                                            override fun onSearchResponse(response: Response) {
+                                                scope.launch(Dispatchers.Main) {
+                                                    val geo = firstGeoObject(response.collection)
+                                                    val pt = geo?.let { firstPointFromGeo(it) }
+                                                    if (geo != null && pt != null) {
+                                                        val t = geo.name?.takeIf { it.isNotBlank() } ?: titleHint
+                                                        searchMarker = SearchPin(pt, t)
+                                                        searchDialogVisible = true
+                                                    } else {
+                                                        trySubmitSearch(
+                                                            scope = scope,
+                                                            searchManager = searchManager,
+                                                            query = query,
+                                                            onSession = { searchSession = it },
+                                                            onPin = { p ->
+                                                                searchMarker = p
+                                                                searchDialogVisible = true
+                                                            },
+                                                            onEmpty = { searchError = labels.mapSearchNoResults }
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            override fun onSearchError(error: com.yandex.runtime.Error) {
+                                                scope.launch(Dispatchers.Main) {
+                                                    trySubmitSearch(
+                                                        scope = scope,
+                                                        searchManager = searchManager,
+                                                        query = query,
+                                                        onSession = { searchSession = it },
+                                                        onPin = { p ->
+                                                            searchMarker = p
+                                                            searchDialogVisible = true
+                                                        },
+                                                        onEmpty = { searchError = labels.mapSearchNoResults }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    )
+                                    return@launch
+                                }
+                                trySubmitSearch(
+                                    scope = scope,
+                                    searchManager = searchManager,
+                                    query = query,
+                                    onSession = { searchSession = it },
+                                    onPin = { p ->
+                                        searchMarker = p
+                                        searchDialogVisible = true
+                                    },
+                                    onEmpty = { searchError = labels.mapSearchNoResults }
+                                )
+                            }
+                        }
+
+                        override fun onError(error: com.yandex.runtime.Error) {
+                            scope.launch(Dispatchers.Main) {
+                                trySubmitSearch(
+                                    scope = scope,
+                                    searchManager = searchManager,
+                                    query = query,
+                                    onSession = { searchSession = it },
+                                    onPin = { p ->
+                                        searchMarker = p
+                                        searchDialogVisible = true
+                                    },
+                                    onEmpty = { searchError = labels.mapSearchNoResults }
+                                )
+                            }
+                        }
+                    }
+                )
             }
         )
+        searchError?.let { msg ->
+            Text(
+                text = msg,
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+        }
         YandexMapContent(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
             cities = cities,
             homeCityId = homeCityId,
-            isDark = isDark,
             searchPin = searchMarker,
-            onCatalogMarkerTap = { cityId ->
+            onCityMarkerTap = { cityId ->
                 val city = cities.firstOrNull { it.id == cityId } ?: return@YandexMapContent
                 val fav = favoritesById[cityId]
                 if (fav != null) {
                     selectedFavorite = fav
                 } else {
-                    selectedAvailable = city
+                    mapPickCity = city
                 }
             },
             onSearchMarkerTap = { searchDialogVisible = true }
@@ -147,6 +276,52 @@ fun MapScreen(
                     }
                 }
             }
+        )
+    }
+
+    mapPickCity?.let { city ->
+        AlertDialog(
+            onDismissRequest = { mapPickCity = null },
+            title = { Text(localizedCity(city.weather, language)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = localizedCondition(city.weather, language),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = signedTemperature(city.weather.temperature, suffix = "°C"),
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Button(
+                        onClick = {
+                            onSelectHomeCatalog(city.id)
+                            mapPickCity = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = bluePrimary)
+                    ) {
+                        Text(labels.setAsHomeCity)
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            onOpenDetail(city.id)
+                            mapPickCity = null
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(labels.details)
+                    }
+                    TextButton(
+                        onClick = { mapPickCity = null },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(labels.cancel)
+                    }
+                }
+            },
+            confirmButton = {}
         )
     }
 
@@ -214,76 +389,71 @@ fun MapScreen(
         )
     }
 
-    selectedAvailable?.let { city ->
-        NoteDialog(
-            title = labels.addToFavorites,
-            label = labels.noteLabel,
-            placeholder = labels.notePlaceholder,
-            initialValue = "",
-            confirmText = labels.save,
-            dismissText = labels.cancel,
-            leadingContent = {
-                AppCard(isDark = isDark, backgroundOverride = MaterialTheme.colorScheme.surfaceVariant) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(localizedCity(city.weather, language), fontWeight = FontWeight.Medium)
-                            Text(
-                                localizedCondition(city.weather, language),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 14.sp
-                            )
-                        }
-                        Text(
-                            signedTemperature(city.weather.temperature, suffix = "°"),
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Light
-                        )
+}
+
+private fun pinFromSuggest(response: SuggestResponse, query: String): SearchPin? {
+    val items = response.items
+    if (items.isEmpty()) return null
+    val top = items.firstOrNull { it.type == SuggestItem.Type.TOPONYM }
+        ?: items.firstOrNull()
+        ?: return null
+    top.center?.let { pt ->
+        val title = top.title?.text?.takeIf { it.isNotBlank() } ?: query
+        return SearchPin(pt, title)
+    }
+    return null
+}
+
+private fun trySubmitSearch(
+    scope: CoroutineScope,
+    searchManager: SearchManager,
+    query: String,
+    onSession: (Session) -> Unit,
+    onPin: (SearchPin) -> Unit,
+    onEmpty: () -> Unit
+) {
+    val worldGeometry = Geometry.fromBoundingBox(
+        BoundingBox(
+            Point(-85.0, -180.0),
+            Point(85.0, 180.0)
+        )
+    )
+    val types = SearchType.GEO.value or SearchType.BIZ.value
+    val opts = SearchOptions()
+        .setSearchTypes(types)
+        .setResultPageSize(10)
+    val session = searchManager.submit(
+        query,
+        worldGeometry,
+        opts,
+        object : Session.SearchListener {
+            override fun onSearchResponse(response: Response) {
+                val geo = firstGeoObject(response.collection)
+                val pt = geo?.let { firstPointFromGeo(it) }
+                scope.launch(Dispatchers.Main) {
+                    if (geo != null && pt != null) {
+                        val title = geo.name?.takeIf { it.isNotBlank() } ?: query
+                        onPin(SearchPin(pt, title))
+                    } else {
+                        onEmpty()
                     }
                 }
-            },
-            footerContent = {
-                OutlinedButton(
-                    onClick = {
-                        onSelectHomeCatalog(city.id)
-                        selectedAvailable = null
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(labels.setAsHomeCity)
-                }
-            },
-            onDismiss = { selectedAvailable = null },
-            onConfirm = { value ->
-                onAddToFavorites(city.id, value)
-                selectedAvailable = null
             }
-        )
-    }
+
+            override fun onSearchError(error: com.yandex.runtime.Error) {
+                scope.launch(Dispatchers.Main) { onEmpty() }
+            }
+        }
+    )
+    onSession(session)
 }
 
 @Composable
 private fun MapSearchBar(
     labels: AppStrings,
-    onSearchResult: (SearchPin) -> Unit
+    onSearch: (String) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
-    val scope = rememberCoroutineScope()
-    val searchManager = remember {
-        SearchFactory.getInstance().createSearchManager(SearchManagerType.COMBINED)
-    }
-    var session: Session? by remember { mutableStateOf(null) }
-    val worldGeometry = remember {
-        Geometry.fromBoundingBox(
-            BoundingBox(
-                Point(-85.0, -180.0),
-                Point(85.0, 180.0)
-            )
-        )
-    }
 
     Row(
         modifier = Modifier
@@ -303,29 +473,7 @@ private fun MapSearchBar(
             onClick = {
                 val q = query.trim()
                 if (q.isBlank()) return@IconButton
-                session?.cancel()
-                val opts = SearchOptions()
-                    .setSearchTypes(SearchType.GEO.value)
-                    .setResultPageSize(5)
-                session = searchManager.submit(
-                    q,
-                    worldGeometry,
-                    opts,
-                    object : Session.SearchListener {
-                        override fun onSearchResponse(response: Response) {
-                            scope.launch(Dispatchers.Main) {
-                                val geo = firstGeoObject(response.collection) ?: return@launch
-                                val pt = firstPointFromGeo(geo) ?: return@launch
-                                val title = geo.name?.takeIf { it.isNotBlank() } ?: q
-                                onSearchResult(SearchPin(pt, title))
-                            }
-                        }
-
-                        override fun onSearchError(error: com.yandex.runtime.Error) {
-                            /* ignore */
-                        }
-                    }
-                )
+                onSearch(q)
             }
         ) {
             Icon(Icons.Default.Search, contentDescription = labels.mapSearchPlaceholder)
@@ -338,32 +486,54 @@ private fun YandexMapContent(
     modifier: Modifier,
     cities: List<CityCatalogItem>,
     homeCityId: String,
-    isDark: Boolean,
     searchPin: SearchPin?,
-    onCatalogMarkerTap: (String) -> Unit,
+    onCityMarkerTap: (String) -> Unit,
     onSearchMarkerTap: () -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val mapView = remember { MapView(context) }
+    val mapView = remember {
+        MapView(context).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+    }
+
+    fun startMapKit() {
+        MapKitFactory.getInstance().onStart()
+        mapView.onStart()
+    }
+
+    fun stopMapKit() {
+        mapView.onStop()
+        MapKitFactory.getInstance().onStop()
+    }
 
     DisposableEffect(lifecycleOwner) {
         val obs = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> mapView.onStart()
-                Lifecycle.Event.ON_STOP -> mapView.onStop()
+                Lifecycle.Event.ON_START -> startMapKit()
+                Lifecycle.Event.ON_STOP -> stopMapKit()
                 else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(obs)
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            startMapKit()
+        }
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(obs)
-            mapView.onStop()
+            stopMapKit()
         }
     }
 
-    LaunchedEffect(isDark) {
-        mapView.mapWindow.map.isNightModeEnabled = isDark
+    LaunchedEffect(Unit) {
+        val map = mapView.mapWindow.map
+        map.mapType = MapType.MAP
+        // Векторная тёмная тема на части устройств даёт «чёрный экран» — оставляем дневной стиль карты.
+        map.isNightModeEnabled = false
     }
 
     LaunchedEffect(cities, homeCityId, searchPin) {
@@ -373,31 +543,36 @@ private fun YandexMapContent(
             val pt = Point(city.latitude, city.longitude)
             val pm = map.mapObjects.addPlacemark(pt)
             pm.userData = city.id
-            pm.zIndex = if (city.id == homeCityId) 2f else 0f
+            pm.zIndex = if (city.id == homeCityId) 2f else 1f
             pm.addTapListener(MapObjectTapListener { obj, _ ->
                 val id = obj.userData as? String ?: return@MapObjectTapListener false
-                onCatalogMarkerTap(id)
+                onCityMarkerTap(id)
                 true
             })
         }
         searchPin?.let { pin ->
             val pm = map.mapObjects.addPlacemark(pin.point)
             pm.userData = "search"
-            pm.zIndex = 3f
+            pm.zIndex = 4f
             pm.addTapListener(MapObjectTapListener { _, _ ->
                 onSearchMarkerTap()
                 true
             })
         }
+    }
+
+    val focusHome = cities.firstOrNull { it.id == homeCityId }
+    LaunchedEffect(searchPin, focusHome?.latitude, focusHome?.longitude, homeCityId) {
+        val map = mapView.mapWindow.map
         val focus = searchPin?.point
-            ?: cities.firstOrNull { it.id == homeCityId }?.let { Point(it.latitude, it.longitude) }
+            ?: focusHome?.let { Point(it.latitude, it.longitude) }
             ?: Point(55.75, 37.62)
-        val zoom = if (searchPin != null) 11f else 5f
-        map.move(
-            CameraPosition(focus, zoom, 0f, 0f),
-            Animation(Animation.Type.SMOOTH, 0.35f),
-            null
-        )
+        val zoom = when {
+            searchPin != null -> 11f
+            focusHome != null -> 6f
+            else -> 4.5f
+        }
+        map.move(CameraPosition(focus, zoom, 0f, 0f))
     }
 
     Box(modifier = modifier) {
