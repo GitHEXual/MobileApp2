@@ -3,23 +3,30 @@ package com.example.myapplication
 import android.view.ViewGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -31,44 +38,26 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.yandex.mapkit.GeoObject
-import com.yandex.mapkit.GeoObjectCollection
-import com.yandex.mapkit.MapKitFactory
-import com.yandex.mapkit.geometry.BoundingBox
-import com.yandex.mapkit.geometry.Geometry
-import com.yandex.mapkit.geometry.Point
-import com.yandex.mapkit.map.CameraPosition
-import com.yandex.mapkit.map.MapObjectTapListener
-import com.yandex.mapkit.map.MapType
-import com.yandex.mapkit.mapview.MapView
-import com.yandex.mapkit.search.Response
-import com.yandex.mapkit.search.SearchFactory
-import com.yandex.mapkit.search.SearchManager
-import com.yandex.mapkit.search.SearchManagerType
-import com.yandex.mapkit.search.SearchOptions
-import com.yandex.mapkit.search.SearchType
-import com.yandex.mapkit.search.Session
-import com.yandex.mapkit.search.SuggestItem
-import com.yandex.mapkit.search.SuggestOptions
-import com.yandex.mapkit.search.SuggestResponse
-import com.yandex.mapkit.search.SuggestSession
-import com.yandex.mapkit.search.SuggestType
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
 
-private data class SearchPin(
-    val point: Point,
-    val title: String
-)
+private sealed class MapSheetState {
+    data class CatalogPick(val city: CityCatalogItem) : MapSheetState()
+    data class FavoritePick(val favorite: FavoriteCity) : MapSheetState()
+    data class SearchPick(val place: GeocodingPlace) : MapSheetState()
+}
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
     modifier: Modifier,
@@ -78,142 +67,71 @@ fun MapScreen(
     labels: AppStrings,
     language: AppLanguage,
     isDark: Boolean,
+    searchMapPlaces: suspend (String) -> List<GeocodingPlace>,
     onBack: () -> Unit,
     onOpenDetail: (String) -> Unit,
     onDeleteFavorite: (String) -> Unit,
     onSelectHomeCatalog: (String) -> Unit,
     onSelectHomeCustom: (Double, Double, String, String) -> Unit
 ) {
-    var selectedFavorite by remember { mutableStateOf<FavoriteCity?>(null) }
-    var mapPickCity by remember { mutableStateOf<CityCatalogItem?>(null) }
-    var searchMarker by remember { mutableStateOf<SearchPin?>(null) }
-    var searchDialogVisible by remember { mutableStateOf(false) }
+    var sheetState by remember { mutableStateOf<MapSheetState?>(null) }
+    var searchPin by remember { mutableStateOf<GeocodingPlace?>(null) }
+    var searchCandidates by remember { mutableStateOf<List<GeocodingPlace>>(emptyList()) }
     var searchError by remember { mutableStateOf<String?>(null) }
+    var searchLoading by remember { mutableStateOf(false) }
 
     val favoritesById = remember(favorites) { favorites.associateBy(FavoriteCity::cityId) }
-
-    val searchManager = remember {
-        SearchFactory.getInstance().createSearchManager(SearchManagerType.COMBINED)
-    }
-    val suggestSession = remember(searchManager) { searchManager.createSuggestSession() }
-    var searchSession by remember { mutableStateOf<Session?>(null) }
-    var resolveSession by remember { mutableStateOf<Session?>(null) }
-
+    val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
 
     Column(modifier = modifier.fillMaxSize()) {
         ScreenTopBar(title = labels.map, onBack = onBack)
         MapSearchBar(
             labels = labels,
+            searchLoading = searchLoading,
             onSearch = { query ->
                 searchError = null
-                suggestSession.reset()
-                resolveSession?.cancel()
-                searchSession?.cancel()
-                val bbox = BoundingBox(Point(-85.0, -180.0), Point(85.0, 180.0))
-                val suggestOpts = SuggestOptions()
-                    .setSuggestTypes(SuggestType.GEO.value)
-                    .setStrictBounds(false)
-                suggestSession.suggest(
-                    query,
-                    bbox,
-                    suggestOpts,
-                    object : SuggestSession.SuggestListener {
-                        override fun onResponse(response: SuggestResponse) {
-                            scope.launch(Dispatchers.Main) {
-                                val direct = pinFromSuggest(response, query)
-                                if (direct != null) {
-                                    searchMarker = direct
-                                    searchDialogVisible = true
-                                    return@launch
-                                }
-                                val top = response.items.firstOrNull { it.type == SuggestItem.Type.TOPONYM }
-                                    ?: response.items.firstOrNull()
-                                val uri = top?.uri
-                                if (!uri.isNullOrBlank()) {
-                                    val titleHint = top.displayText?.takeIf { it.isNotBlank() }
-                                        ?: top.title?.text?.takeIf { it.isNotBlank() }
-                                        ?: top.searchText?.takeIf { it.isNotBlank() }
-                                        ?: query
-                                    resolveSession = searchManager.resolveURI(
-                                        uri,
-                                        SearchOptions().setSearchTypes(SearchType.GEO.value),
-                                        object : Session.SearchListener {
-                                            override fun onSearchResponse(response: Response) {
-                                                scope.launch(Dispatchers.Main) {
-                                                    val geo = firstGeoObject(response.collection)
-                                                    val pt = geo?.let { firstPointFromGeo(it) }
-                                                    if (geo != null && pt != null) {
-                                                        val t = geo.name?.takeIf { it.isNotBlank() } ?: titleHint
-                                                        searchMarker = SearchPin(pt, t)
-                                                        searchDialogVisible = true
-                                                    } else {
-                                                        trySubmitSearch(
-                                                            scope = scope,
-                                                            searchManager = searchManager,
-                                                            query = query,
-                                                            onSession = { searchSession = it },
-                                                            onPin = { p ->
-                                                                searchMarker = p
-                                                                searchDialogVisible = true
-                                                            },
-                                                            onEmpty = { searchError = labels.mapSearchNoResults }
-                                                        )
-                                                    }
-                                                }
-                                            }
-
-                                            override fun onSearchError(error: com.yandex.runtime.Error) {
-                                                scope.launch(Dispatchers.Main) {
-                                                    trySubmitSearch(
-                                                        scope = scope,
-                                                        searchManager = searchManager,
-                                                        query = query,
-                                                        onSession = { searchSession = it },
-                                                        onPin = { p ->
-                                                            searchMarker = p
-                                                            searchDialogVisible = true
-                                                        },
-                                                        onEmpty = { searchError = labels.mapSearchNoResults }
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    )
-                                    return@launch
-                                }
-                                trySubmitSearch(
-                                    scope = scope,
-                                    searchManager = searchManager,
-                                    query = query,
-                                    onSession = { searchSession = it },
-                                    onPin = { p ->
-                                        searchMarker = p
-                                        searchDialogVisible = true
-                                    },
-                                    onEmpty = { searchError = labels.mapSearchNoResults }
-                                )
-                            }
-                        }
-
-                        override fun onError(error: com.yandex.runtime.Error) {
-                            scope.launch(Dispatchers.Main) {
-                                trySubmitSearch(
-                                    scope = scope,
-                                    searchManager = searchManager,
-                                    query = query,
-                                    onSession = { searchSession = it },
-                                    onPin = { p ->
-                                        searchMarker = p
-                                        searchDialogVisible = true
-                                    },
-                                    onEmpty = { searchError = labels.mapSearchNoResults }
-                                )
-                            }
-                        }
+                searchCandidates = emptyList()
+                searchLoading = true
+                scope.launch {
+                    val list = searchMapPlaces(query)
+                    searchLoading = false
+                    if (list.isEmpty()) {
+                        searchError = labels.mapSearchNoResults
+                    } else {
+                        searchCandidates = list
                     }
-                )
+                }
             }
+        )
+        if (searchCandidates.isNotEmpty()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 220.dp)
+                    .padding(horizontal = 12.dp)
+            ) {
+                items(searchCandidates, key = { "${it.latitude}_${it.longitude}_${it.title}" }) { place ->
+                    OutlinedButton(
+                        onClick = {
+                            searchPin = place
+                            searchCandidates = emptyList()
+                            sheetState = MapSheetState.SearchPick(place)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Text(place.title, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+        Text(
+            text = labels.mapSearchGeocodingHint,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
         )
         searchError?.let { msg ->
             Text(
@@ -223,234 +141,244 @@ fun MapScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
         }
-        YandexMapContent(
+        OsmMapContent(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
             cities = cities,
             homeCityId = homeCityId,
-            searchPin = searchMarker,
-            onCityMarkerTap = { cityId ->
-                val city = cities.firstOrNull { it.id == cityId } ?: return@YandexMapContent
+            searchPin = searchPin,
+            language = language,
+            onCatalogMarkerTap = { cityId ->
+                val city = cities.firstOrNull { it.id == cityId } ?: return@OsmMapContent
                 val fav = favoritesById[cityId]
-                if (fav != null) {
-                    selectedFavorite = fav
+                sheetState = if (fav != null) {
+                    MapSheetState.FavoritePick(fav)
                 } else {
-                    mapPickCity = city
+                    MapSheetState.CatalogPick(city)
                 }
             },
-            onSearchMarkerTap = { searchDialogVisible = true }
+            onSearchMarkerTap = {
+                val pin = searchPin ?: return@OsmMapContent
+                sheetState = MapSheetState.SearchPick(pin)
+            }
         )
     }
 
-    if (searchDialogVisible && searchMarker != null) {
-        val pin = searchMarker!!
-        AlertDialog(
-            onDismissRequest = { searchDialogVisible = false },
-            title = { Text(pin.title) },
-            text = {
-                Text(
-                    text = labels.mapSearchResultHint,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+    if (sheetState != null) {
+        ModalBottomSheet(
+            onDismissRequest = { sheetState = null },
+            sheetState = bottomSheetState
+        ) {
+            when (val s = sheetState!!) {
+                is MapSheetState.CatalogPick -> MapCatalogSheet(
+                    city = s.city,
+                    labels = labels,
+                    language = language,
+                    onSetHome = {
+                        onSelectHomeCatalog(s.city.id)
+                        sheetState = null
+                    },
+                    onDetails = {
+                        onOpenDetail(s.city.id)
+                        sheetState = null
+                    },
+                    onClose = { sheetState = null }
                 )
-            },
-            confirmButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { searchDialogVisible = false }) {
-                        Text(labels.cancel)
-                    }
-                    Button(
-                        onClick = {
-                            onSelectHomeCustom(
-                                pin.point.latitude,
-                                pin.point.longitude,
-                                pin.title,
-                                pin.title
-                            )
-                            searchDialogVisible = false
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = bluePrimary)
-                    ) {
-                        Text(labels.setAsHomeCity)
-                    }
-                }
-            }
-        )
-    }
-
-    mapPickCity?.let { city ->
-        AlertDialog(
-            onDismissRequest = { mapPickCity = null },
-            title = { Text(localizedCity(city.weather, language)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = localizedCondition(city.weather, language),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = signedTemperature(city.weather.temperature, suffix = "°C"),
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Button(
-                        onClick = {
-                            onSelectHomeCatalog(city.id)
-                            mapPickCity = null
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = bluePrimary)
-                    ) {
-                        Text(labels.setAsHomeCity)
-                    }
-                    OutlinedButton(
-                        onClick = {
-                            onOpenDetail(city.id)
-                            mapPickCity = null
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(labels.details)
-                    }
-                    TextButton(
-                        onClick = { mapPickCity = null },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(labels.cancel)
-                    }
-                }
-            },
-            confirmButton = {}
-        )
-    }
-
-    selectedFavorite?.let { favorite ->
-        AlertDialog(
-            onDismissRequest = { selectedFavorite = null },
-            title = { Text(localizedCity(favorite.weather, language)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = signedTemperature(favorite.weather.temperature, suffix = "°C"),
-                            fontSize = 36.sp,
-                            fontWeight = FontWeight.Light
+                is MapSheetState.FavoritePick -> MapFavoriteSheet(
+                    favorite = s.favorite,
+                    labels = labels,
+                    language = language,
+                    isDark = isDark,
+                    onSetHome = {
+                        onSelectHomeCatalog(s.favorite.cityId)
+                        sheetState = null
+                    },
+                    onDetails = {
+                        onOpenDetail(s.favorite.cityId)
+                        sheetState = null
+                    },
+                    onDelete = {
+                        onDeleteFavorite(s.favorite.cityId)
+                        sheetState = null
+                    },
+                    onClose = { sheetState = null }
+                )
+                is MapSheetState.SearchPick -> MapSearchResultSheet(
+                    place = s.place,
+                    labels = labels,
+                    onSetHome = {
+                        onSelectHomeCustom(
+                            s.place.latitude,
+                            s.place.longitude,
+                            s.place.title,
+                            s.place.title
                         )
-                        Text(
-                            text = localizedCondition(favorite.weather, language),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    if (!favorite.note.isNullOrBlank()) {
-                        NotePreviewCard(
-                            note = favorite.note,
-                            label = labels.noteLabel,
-                            isDark = isDark,
-                            italic = true
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = {
-                            onSelectHomeCatalog(favorite.cityId)
-                            selectedFavorite = null
-                        }
-                    ) {
-                        Text(labels.setAsHomeCity)
-                    }
-                    Button(
-                        onClick = {
-                            onOpenDetail(favorite.cityId)
-                            selectedFavorite = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = bluePrimary)
-                    ) {
-                        Text(labels.openDetails)
-                    }
-                }
-            },
-            dismissButton = {
-                OutlinedButton(
-                    onClick = {
-                        onDeleteFavorite(favorite.cityId)
-                        selectedFavorite = null
-                    }
-                ) {
-                    Text(labels.delete, color = destructive)
-                }
-            }
-        )
-    }
-
-}
-
-private fun pinFromSuggest(response: SuggestResponse, query: String): SearchPin? {
-    val items = response.items
-    if (items.isEmpty()) return null
-    val top = items.firstOrNull { it.type == SuggestItem.Type.TOPONYM }
-        ?: items.firstOrNull()
-        ?: return null
-    top.center?.let { pt ->
-        val title = top.title?.text?.takeIf { it.isNotBlank() } ?: query
-        return SearchPin(pt, title)
-    }
-    return null
-}
-
-private fun trySubmitSearch(
-    scope: CoroutineScope,
-    searchManager: SearchManager,
-    query: String,
-    onSession: (Session) -> Unit,
-    onPin: (SearchPin) -> Unit,
-    onEmpty: () -> Unit
-) {
-    val worldGeometry = Geometry.fromBoundingBox(
-        BoundingBox(
-            Point(-85.0, -180.0),
-            Point(85.0, 180.0)
-        )
-    )
-    val types = SearchType.GEO.value or SearchType.BIZ.value
-    val opts = SearchOptions()
-        .setSearchTypes(types)
-        .setResultPageSize(10)
-    val session = searchManager.submit(
-        query,
-        worldGeometry,
-        opts,
-        object : Session.SearchListener {
-            override fun onSearchResponse(response: Response) {
-                val geo = firstGeoObject(response.collection)
-                val pt = geo?.let { firstPointFromGeo(it) }
-                scope.launch(Dispatchers.Main) {
-                    if (geo != null && pt != null) {
-                        val title = geo.name?.takeIf { it.isNotBlank() } ?: query
-                        onPin(SearchPin(pt, title))
-                    } else {
-                        onEmpty()
-                    }
-                }
-            }
-
-            override fun onSearchError(error: com.yandex.runtime.Error) {
-                scope.launch(Dispatchers.Main) { onEmpty() }
+                        sheetState = null
+                    },
+                    onClose = { sheetState = null }
+                )
             }
         }
-    )
-    onSession(session)
+    }
+}
+
+@Composable
+private fun MapCatalogSheet(
+    city: CityCatalogItem,
+    labels: AppStrings,
+    language: AppLanguage,
+    onSetHome: () -> Unit,
+    onDetails: () -> Unit,
+    onClose: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = localizedCity(city.weather, language),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            text = localizedCondition(city.weather, language),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = signedTemperature(city.weather.temperature, suffix = "°C"),
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Medium
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Button(
+            onClick = onSetHome,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = bluePrimary)
+        ) {
+            Text(labels.setAsHomeCity)
+        }
+        OutlinedButton(onClick = onDetails, modifier = Modifier.fillMaxWidth()) {
+            Text(labels.details)
+        }
+        OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
+            Text(labels.close)
+        }
+    }
+}
+
+@Composable
+private fun MapFavoriteSheet(
+    favorite: FavoriteCity,
+    labels: AppStrings,
+    language: AppLanguage,
+    isDark: Boolean,
+    onSetHome: () -> Unit,
+    onDetails: () -> Unit,
+    onDelete: () -> Unit,
+    onClose: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = localizedCity(favorite.weather, language),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold
+        )
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = signedTemperature(favorite.weather.temperature, suffix = "°C"),
+                fontSize = 36.sp,
+                fontWeight = FontWeight.Light
+            )
+            Text(
+                text = localizedCondition(favorite.weather, language),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (!favorite.note.isNullOrBlank()) {
+            NotePreviewCard(
+                note = favorite.note,
+                label = labels.noteLabel,
+                isDark = isDark,
+                italic = true
+            )
+        }
+        Button(
+            onClick = onSetHome,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = bluePrimary)
+        ) {
+            Text(labels.setAsHomeCity)
+        }
+        OutlinedButton(onClick = onDetails, modifier = Modifier.fillMaxWidth()) {
+            Text(labels.openDetails)
+        }
+        OutlinedButton(
+            onClick = onDelete,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(labels.delete, color = destructive)
+        }
+        OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
+            Text(labels.close)
+        }
+    }
+}
+
+@Composable
+private fun MapSearchResultSheet(
+    place: GeocodingPlace,
+    labels: AppStrings,
+    onSetHome: () -> Unit,
+    onClose: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = place.title,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            text = labels.mapSearchResultHint,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Button(
+            onClick = onSetHome,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = bluePrimary)
+        ) {
+            Text(labels.setAsHomeCity)
+        }
+        OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
+            Text(labels.close)
+        }
+    }
 }
 
 @Composable
 private fun MapSearchBar(
     labels: AppStrings,
+    searchLoading: Boolean,
     onSearch: (String) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
@@ -469,25 +397,29 @@ private fun MapSearchBar(
             placeholder = { Text(labels.mapSearchPlaceholder) },
             singleLine = true
         )
-        IconButton(
-            onClick = {
-                val q = query.trim()
-                if (q.isBlank()) return@IconButton
-                onSearch(q)
+        if (searchLoading) {
+            CircularProgressIndicator(modifier = Modifier.padding(8.dp))
+        } else {
+            IconButton(
+                onClick = {
+                    val q = query.trim()
+                    if (q.isNotBlank()) onSearch(q)
+                }
+            ) {
+                Icon(Icons.Default.Search, contentDescription = labels.mapSearchPlaceholder)
             }
-        ) {
-            Icon(Icons.Default.Search, contentDescription = labels.mapSearchPlaceholder)
         }
     }
 }
 
 @Composable
-private fun YandexMapContent(
+private fun OsmMapContent(
     modifier: Modifier,
     cities: List<CityCatalogItem>,
     homeCityId: String,
-    searchPin: SearchPin?,
-    onCityMarkerTap: (String) -> Unit,
+    searchPin: GeocodingPlace?,
+    language: AppLanguage,
+    onCatalogMarkerTap: (String) -> Unit,
     onSearchMarkerTap: () -> Unit
 ) {
     val context = LocalContext.current
@@ -498,113 +430,81 @@ private fun YandexMapContent(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
+            setMultiTouchControls(true)
+            setTileSource(TileSourceFactory.MAPNIK)
+            minZoomLevel = 3.0
+            maxZoomLevel = 19.0
         }
-    }
-
-    fun startMapKit() {
-        MapKitFactory.getInstance().onStart()
-        mapView.onStart()
-    }
-
-    fun stopMapKit() {
-        mapView.onStop()
-        MapKitFactory.getInstance().onStop()
     }
 
     DisposableEffect(lifecycleOwner) {
         val obs = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> startMapKit()
-                Lifecycle.Event.ON_STOP -> stopMapKit()
+                Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
                 else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(obs)
-        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-            startMapKit()
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            mapView.onResume()
         }
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(obs)
-            stopMapKit()
+            mapView.onPause()
         }
     }
 
-    LaunchedEffect(Unit) {
-        val map = mapView.mapWindow.map
-        map.mapType = MapType.MAP
-        // Векторная тёмная тема на части устройств даёт «чёрный экран» — оставляем дневной стиль карты.
-        map.isNightModeEnabled = false
-    }
-
-    LaunchedEffect(cities, homeCityId, searchPin) {
-        val map = mapView.mapWindow.map
-        map.mapObjects.clear()
+    LaunchedEffect(cities, homeCityId, searchPin, language) {
+        mapView.overlays.removeAll { it is Marker }
         cities.forEach { city ->
-            val pt = Point(city.latitude, city.longitude)
-            val pm = map.mapObjects.addPlacemark(pt)
-            pm.userData = city.id
-            pm.zIndex = if (city.id == homeCityId) 2f else 1f
-            pm.addTapListener(MapObjectTapListener { obj, _ ->
-                val id = obj.userData as? String ?: return@MapObjectTapListener false
-                onCityMarkerTap(id)
-                true
-            })
+            val marker = Marker(mapView).apply {
+                position = GeoPoint(city.latitude, city.longitude)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                title = localizedCity(city.weather, language)
+                relatedObject = city.id
+                setOnMarkerClickListener { m, _ ->
+                    val id = m.relatedObject as? String ?: return@setOnMarkerClickListener false
+                    onCatalogMarkerTap(id)
+                    true
+                }
+            }
+            mapView.overlays.add(marker)
         }
         searchPin?.let { pin ->
-            val pm = map.mapObjects.addPlacemark(pin.point)
-            pm.userData = "search"
-            pm.zIndex = 4f
-            pm.addTapListener(MapObjectTapListener { _, _ ->
-                onSearchMarkerTap()
-                true
-            })
+            val marker = Marker(mapView).apply {
+                position = GeoPoint(pin.latitude, pin.longitude)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                title = pin.title
+                relatedObject = "search"
+                setOnMarkerClickListener { _, _ ->
+                    onSearchMarkerTap()
+                    true
+                }
+            }
+            mapView.overlays.add(marker)
         }
+        mapView.invalidate()
     }
 
     val focusHome = cities.firstOrNull { it.id == homeCityId }
     LaunchedEffect(searchPin, focusHome?.latitude, focusHome?.longitude, homeCityId) {
-        val map = mapView.mapWindow.map
-        val focus = searchPin?.point
-            ?: focusHome?.let { Point(it.latitude, it.longitude) }
-            ?: Point(55.75, 37.62)
+        val gp = searchPin?.let { GeoPoint(it.latitude, it.longitude) }
+            ?: focusHome?.let { GeoPoint(it.latitude, it.longitude) }
+            ?: GeoPoint(55.75, 37.62)
         val zoom = when {
-            searchPin != null -> 11f
-            focusHome != null -> 6f
-            else -> 4.5f
+            searchPin != null -> 11.0
+            focusHome != null -> 6.0
+            else -> 4.5
         }
-        map.move(CameraPosition(focus, zoom, 0f, 0f))
+        mapView.controller.setZoom(zoom)
+        mapView.controller.setCenter(gp)
     }
 
     Box(modifier = modifier) {
         AndroidView(
-            factory = { _ -> mapView },
+            factory = { mapView },
             modifier = Modifier.fillMaxSize()
         )
     }
-}
-
-private fun firstGeoObject(collection: GeoObjectCollection): GeoObject? {
-    for (item in collection.children) {
-        item.obj?.let { return it }
-        item.collection?.let { sub ->
-            firstGeoObject(sub)?.let { return it }
-        }
-    }
-    return null
-}
-
-private fun firstPointFromGeo(geo: GeoObject): Point? {
-    for (g in geo.geometry) {
-        g.point?.let { return it }
-        g.boundingBox?.let { bb ->
-            val sw = bb.southWest
-            val ne = bb.northEast
-            return Point(
-                (sw.latitude + ne.latitude) / 2.0,
-                (sw.longitude + ne.longitude) / 2.0
-            )
-        }
-        g.circle?.center?.let { return it }
-    }
-    return null
 }

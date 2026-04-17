@@ -22,6 +22,7 @@ data class AppStrings(
     val delete: String,
     val save: String,
     val cancel: String,
+    val close: String,
     val noteLabel: String,
     val notePlaceholder: String,
     val language: String,
@@ -42,14 +43,7 @@ data class AppStrings(
     val setAsHomeCity: String,
     val mapSearchPlaceholder: String,
     val mapSearchResultHint: String,
-    val mapYandexKeysSection: String,
-    val mapKeysBuiltinName: String,
-    val mapKeysAdd: String,
-    val mapKeysMakeActive: String,
-    val mapKeysRemove: String,
-    val mapKeyNameLabel: String,
-    val mapKeyValueLabel: String,
-    val mapKeysStateActive: String,
+    val mapSearchGeocodingHint: String,
     val mapSearchNoResults: String
 )
 
@@ -75,6 +69,7 @@ val stringsRu = AppStrings(
     delete = "Удалить",
     save = "Сохранить",
     cancel = "Отмена",
+    close = "Закрыть",
     noteLabel = "Заметка",
     notePlaceholder = "Введите заметку...",
     language = "Язык",
@@ -95,14 +90,7 @@ val stringsRu = AppStrings(
     setAsHomeCity = "Сделать домашним",
     mapSearchPlaceholder = "Поиск на карте",
     mapSearchResultHint = "Нажмите «Сделать домашним», чтобы показывать погоду этого города на главном экране.",
-    mapYandexKeysSection = "Ключи Яндекс Карты",
-    mapKeysBuiltinName = "Встроенный (учебный)",
-    mapKeysAdd = "Добавить ключ",
-    mapKeysMakeActive = "Активировать",
-    mapKeysRemove = "Удалить",
-    mapKeyNameLabel = "Название",
-    mapKeyValueLabel = "Ключ API",
-    mapKeysStateActive = "Активен",
+    mapSearchGeocodingHint = "Поиск мест — Open-Meteo Geocoding (без ключа), как и прогноз погоды.",
     mapSearchNoResults = "Ничего не найдено — попробуйте другое название"
 )
 
@@ -128,6 +116,7 @@ val stringsEn = AppStrings(
     delete = "Delete",
     save = "Save",
     cancel = "Cancel",
+    close = "Close",
     noteLabel = "Note",
     notePlaceholder = "Enter note...",
     language = "Language",
@@ -148,14 +137,7 @@ val stringsEn = AppStrings(
     setAsHomeCity = "Set as home city",
     mapSearchPlaceholder = "Search on map",
     mapSearchResultHint = "Tap «Set as home city» to show this city’s weather on the home screen.",
-    mapYandexKeysSection = "Yandex Maps keys",
-    mapKeysBuiltinName = "Built-in (educational)",
-    mapKeysAdd = "Add key",
-    mapKeysMakeActive = "Activate",
-    mapKeysRemove = "Remove",
-    mapKeyNameLabel = "Name",
-    mapKeyValueLabel = "API key",
-    mapKeysStateActive = "Active",
+    mapSearchGeocodingHint = "Place search uses Open-Meteo Geocoding (no API key), same stack as the forecast.",
     mapSearchNoResults = "Nothing found — try a different name"
 )
 

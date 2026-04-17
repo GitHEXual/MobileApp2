@@ -21,7 +21,6 @@ class WeatherAppViewModel(application: Application) : AndroidViewModel(applicati
     private val loadingFlow = MutableStateFlow(true)
     private val networkErrorFlow = MutableStateFlow<String?>(null)
     private val homeSelectionFlow = MutableStateFlow(preferences.loadHomeCitySelection())
-    private val mapKeysRevision = MutableStateFlow(0)
 
     private data class LangThemeFavorites(
         val language: AppLanguage,
@@ -42,9 +41,8 @@ class WeatherAppViewModel(application: Application) : AndroidViewModel(applicati
         combine(citiesFlow, loadingFlow, networkErrorFlow) { cities, loading, err ->
             CitiesLoadingError(cities, loading, err)
         },
-        homeSelectionFlow,
-        mapKeysRevision
-    ) { ltf, cle, homeSel, _ ->
+        homeSelectionFlow
+    ) { ltf, cle, homeSel ->
         val labels = strings(ltf.language)
         val savedHomeId = when (homeSel) {
             is HomeCitySelection.Catalog -> homeSel.cityId
@@ -60,8 +58,7 @@ class WeatherAppViewModel(application: Application) : AndroidViewModel(applicati
             cities = cle.cities,
             favorites = ltf.entities.mapNotNull { it.toFavoriteCity(cle.cities) },
             isLoading = cle.loading,
-            networkErrorMessage = cle.err,
-            mapKeyRows = buildMapKeyRows()
+            networkErrorMessage = cle.err
         )
     }.stateIn(
         scope = viewModelScope,
@@ -77,18 +74,8 @@ class WeatherAppViewModel(application: Application) : AndroidViewModel(applicati
         refreshWeather()
     }
 
-    private fun buildMapKeyRows(): List<MapKeyRow> {
-        val active = preferences.loadActiveMapKeyId()
-        return preferences.loadMapApiKeys().map { k ->
-            MapKeyRow(
-                id = k.id,
-                displayName = k.displayName,
-                maskedKey = maskMapApiKey(k.apiKey),
-                isBuiltin = false,
-                isActive = active == k.id
-            )
-        }
-    }
+    suspend fun searchMapPlaces(query: String): List<GeocodingPlace> =
+        remoteRepository.searchPlaces(query, languageFlow.value)
 
     fun refreshWeather() {
         viewModelScope.launch {
@@ -138,23 +125,6 @@ class WeatherAppViewModel(application: Application) : AndroidViewModel(applicati
         preferences.saveHomeCitySelection(sel)
         homeSelectionFlow.value = sel
         refreshWeather()
-    }
-
-    fun addMapApiKey(displayName: String, apiKey: String) {
-        preferences.addMapApiKey(displayName, apiKey)
-        mapKeysRevision.value++
-    }
-
-    fun removeMapApiKey(id: String) {
-        preferences.removeMapApiKey(id)
-        mapKeysRevision.value++
-    }
-
-    fun setActiveMapApiKey(id: String) {
-        if (preferences.loadActiveMapKeyId() == id) return
-        preferences.setActiveMapKeyId(id)
-        mapKeysRevision.value++
-        AppRestarter.restartProcess(getApplication())
     }
 
     fun addFavorite(cityId: String, note: String?) {

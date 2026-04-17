@@ -138,6 +138,7 @@ fun WeatherApp(
                             labels = state.labels,
                             language = state.language,
                             isDark = state.isDark,
+                            searchMapPlaces = { q -> appViewModel.searchMapPlaces(q) },
                             onBack = {
                                 if (!navController.popBackStack()) {
                                     navController.navigateTopLevel(AppRoutes.HOME)
@@ -176,17 +177,13 @@ fun WeatherApp(
                             language = state.language,
                             theme = state.theme,
                             isDark = state.isDark,
-                            mapKeyRows = state.mapKeyRows,
                             onBack = {
                                 if (!navController.popBackStack()) {
                                     navController.navigateTopLevel(AppRoutes.HOME)
                                 }
                             },
                             onLanguageChange = appViewModel::setLanguage,
-                            onThemeChange = appViewModel::setTheme,
-                            onSetActiveMapKey = appViewModel::setActiveMapApiKey,
-                            onAddMapKey = appViewModel::addMapApiKey,
-                            onRemoveMapKey = appViewModel::removeMapApiKey
+                            onThemeChange = appViewModel::setTheme
                         )
                     }
                 }

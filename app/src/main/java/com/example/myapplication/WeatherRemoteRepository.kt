@@ -15,7 +15,8 @@ data class WeatherLoadResult(
 )
 
 class WeatherRemoteRepository(
-    private val api: OpenMeteoApi = createDefaultOpenMeteoApi()
+    private val api: OpenMeteoApi = createDefaultOpenMeteoApi(),
+    private val geocodingApi: OpenMeteoGeocodingApi = createDefaultGeocodingApi()
 ) {
 
     suspend fun loadForecastForPlace(place: CityPlace): CityCatalogItem? = withContext(Dispatchers.IO) {
@@ -42,18 +43,52 @@ class WeatherRemoteRepository(
         }
     }
 
+    suspend fun searchPlaces(query: String, language: AppLanguage): List<GeocodingPlace> =
+        withContext(Dispatchers.IO) {
+            val q = query.trim()
+            if (q.isEmpty()) return@withContext emptyList()
+            runCatching {
+                val langCode = when (language) {
+                    AppLanguage.RU -> "ru"
+                    AppLanguage.EN -> "en"
+                }
+                val response = geocodingApi.search(name = q, count = 10, language = langCode)
+                response.results.orEmpty().mapNotNull { dto ->
+                    val lat = dto.latitude ?: return@mapNotNull null
+                    val lon = dto.longitude ?: return@mapNotNull null
+                    val base = dto.name?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                    val suffix = listOfNotNull(
+                        dto.admin1?.takeIf { it.isNotBlank() },
+                        dto.country?.takeIf { it.isNotBlank() }
+                    ).distinct().joinToString(", ")
+                    val title = if (suffix.isNotEmpty()) "$base ($suffix)" else base
+                    GeocodingPlace(title = title, latitude = lat, longitude = lon)
+                }
+            }.getOrElse { emptyList() }
+        }
+
     companion object {
-        private fun createDefaultOpenMeteoApi(): OpenMeteoApi {
-            val client = OkHttpClient.Builder()
+        private val sharedClient: OkHttpClient by lazy {
+            OkHttpClient.Builder()
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(20, TimeUnit.SECONDS)
                 .build()
-            return Retrofit.Builder()
+        }
+
+        private fun createDefaultOpenMeteoApi(): OpenMeteoApi =
+            Retrofit.Builder()
                 .baseUrl(OpenMeteoApi.BASE_URL)
-                .client(client)
+                .client(sharedClient)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()
                 .create(OpenMeteoApi::class.java)
-        }
+
+        private fun createDefaultGeocodingApi(): OpenMeteoGeocodingApi =
+            Retrofit.Builder()
+                .baseUrl(OpenMeteoGeocodingApi.BASE_URL)
+                .client(sharedClient)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+                .create(OpenMeteoGeocodingApi::class.java)
     }
 }

@@ -1,11 +1,5 @@
 package com.example.myapplication
 
-data class StoredMapApiKey(
-    val id: String,
-    val displayName: String,
-    val apiKey: String
-)
-
 sealed class HomeCitySelection {
     data class Catalog(val cityId: String) : HomeCitySelection()
     data class Custom(
@@ -32,10 +26,4 @@ object HomeCityIds {
         val b = (longitude * 100_000.0).toLong()
         return "custom_${a}_$b"
     }
-}
-
-fun maskMapApiKey(key: String): String {
-    val t = key.trim()
-    if (t.length <= 8) return "••••"
-    return "${t.take(4)}…${t.takeLast(4)}"
 }
