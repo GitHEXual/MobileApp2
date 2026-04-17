@@ -38,7 +38,18 @@ data class AppStrings(
     val sevenDayForecast: String,
     val version: String,
     val updated: String,
-    val offlineWeatherHint: String
+    val offlineWeatherHint: String,
+    val setAsHomeCity: String,
+    val mapSearchPlaceholder: String,
+    val mapSearchResultHint: String,
+    val mapYandexKeysSection: String,
+    val mapKeysBuiltinName: String,
+    val mapKeysAdd: String,
+    val mapKeysMakeActive: String,
+    val mapKeysRemove: String,
+    val mapKeyNameLabel: String,
+    val mapKeyValueLabel: String,
+    val mapKeysStateActive: String
 )
 
 val stringsRu = AppStrings(
@@ -79,7 +90,18 @@ val stringsRu = AppStrings(
     sevenDayForecast = "7-дневный прогноз",
     version = "Версия: 1.0.0",
     updated = "Обновлено: 19.02.2026",
-    offlineWeatherHint = "Нет сети — показаны данные без обновления"
+    offlineWeatherHint = "Нет сети — показаны данные без обновления",
+    setAsHomeCity = "Сделать домашним",
+    mapSearchPlaceholder = "Поиск на карте",
+    mapSearchResultHint = "Нажмите «Сделать домашним», чтобы показывать погоду этого города на главном экране.",
+    mapYandexKeysSection = "Ключи Яндекс.Карт",
+    mapKeysBuiltinName = "Встроенный (учебный)",
+    mapKeysAdd = "Добавить ключ",
+    mapKeysMakeActive = "Активировать",
+    mapKeysRemove = "Удалить",
+    mapKeyNameLabel = "Название",
+    mapKeyValueLabel = "Ключ API",
+    mapKeysStateActive = "Активен"
 )
 
 val stringsEn = AppStrings(
@@ -120,7 +142,18 @@ val stringsEn = AppStrings(
     sevenDayForecast = "7-day forecast",
     version = "Version: 1.0.0",
     updated = "Updated: 19.02.2026",
-    offlineWeatherHint = "Offline — showing cached placeholder data"
+    offlineWeatherHint = "Offline — showing cached placeholder data",
+    setAsHomeCity = "Set as home city",
+    mapSearchPlaceholder = "Search on map",
+    mapSearchResultHint = "Tap «Set as home city» to show this city’s weather on the home screen.",
+    mapYandexKeysSection = "Yandex Map API keys",
+    mapKeysBuiltinName = "Built-in (educational)",
+    mapKeysAdd = "Add key",
+    mapKeysMakeActive = "Activate",
+    mapKeysRemove = "Remove",
+    mapKeyNameLabel = "Name",
+    mapKeyValueLabel = "API key",
+    mapKeysStateActive = "Active"
 )
 
 fun strings(language: AppLanguage): AppStrings {

@@ -48,7 +48,6 @@ fun HomeScreen(
             .verticalScroll(scrollState)
             .padding(bottom = 20.dp)
     ) {
-        SearchBar(labels = labels, isDark = isDark)
         AppCard(
             modifier = Modifier
                 .fillMaxWidth()

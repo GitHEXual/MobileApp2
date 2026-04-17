@@ -336,6 +336,7 @@ fun NoteDialog(
     confirmText: String,
     dismissText: String,
     leadingContent: @Composable (() -> Unit)? = null,
+    footerContent: @Composable (() -> Unit)? = null,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
 ) {
@@ -355,6 +356,7 @@ fun NoteDialog(
                     placeholder = { Text(placeholder) },
                     minLines = 3
                 )
+                footerContent?.invoke()
             }
         },
         confirmButton = {

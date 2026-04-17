@@ -136,6 +136,7 @@ fun WeatherApp(
                             modifier = Modifier.fillMaxSize(),
                             cities = state.cities,
                             favorites = state.favorites,
+                            homeCityId = state.homeCityId,
                             labels = state.labels,
                             language = state.language,
                             isDark = state.isDark,
@@ -146,7 +147,9 @@ fun WeatherApp(
                             },
                             onOpenDetail = { cityId -> navController.navigate(AppRoutes.detail(cityId)) },
                             onDeleteFavorite = appViewModel::deleteFavorite,
-                            onAddToFavorites = appViewModel::addFavorite
+                            onAddToFavorites = appViewModel::addFavorite,
+                            onSelectHomeCatalog = appViewModel::setHomeCityCatalog,
+                            onSelectHomeCustom = appViewModel::setHomeCityCustom
                         )
                     }
 
@@ -175,13 +178,17 @@ fun WeatherApp(
                             language = state.language,
                             theme = state.theme,
                             isDark = state.isDark,
+                            mapKeyRows = state.mapKeyRows,
                             onBack = {
                                 if (!navController.popBackStack()) {
                                     navController.navigateTopLevel(AppRoutes.HOME)
                                 }
                             },
                             onLanguageChange = appViewModel::setLanguage,
-                            onThemeChange = appViewModel::setTheme
+                            onThemeChange = appViewModel::setTheme,
+                            onSetActiveMapKey = appViewModel::setActiveMapApiKey,
+                            onAddMapKey = appViewModel::addMapApiKey,
+                            onRemoveMapKey = appViewModel::removeMapApiKey
                         )
                     }
                 }

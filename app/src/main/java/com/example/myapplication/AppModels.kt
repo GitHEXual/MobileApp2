@@ -36,7 +36,17 @@ data class CityCatalogItem(
     val id: String,
     val weather: WeatherInfo,
     val mapPosition: MapPosition,
-    val forecast: List<ForecastDay> = emptyList()
+    val forecast: List<ForecastDay> = emptyList(),
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0
+)
+
+data class MapKeyRow(
+    val id: String,
+    val displayName: String,
+    val maskedKey: String,
+    val isBuiltin: Boolean,
+    val isActive: Boolean
 )
 
 data class FavoriteCity(
@@ -52,10 +62,12 @@ data class WeatherAppUiState(
     val theme: AppThemeMode = AppThemeMode.LIGHT,
     val labels: AppStrings = stringsRu,
     val homeCity: CityCatalogItem = WeatherCatalog.homeCity,
+    val homeCityId: String = WeatherCatalog.HOME_CITY_ID,
     val cities: List<CityCatalogItem> = WeatherCatalog.offlineCities(),
     val favorites: List<FavoriteCity> = emptyList(),
     val isLoading: Boolean = false,
-    val networkErrorMessage: String? = null
+    val networkErrorMessage: String? = null,
+    val mapKeyRows: List<MapKeyRow> = emptyList()
 ) {
     val isDark: Boolean
         get() = theme == AppThemeMode.DARK

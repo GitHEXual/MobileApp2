@@ -18,6 +18,12 @@ class WeatherRemoteRepository(
     private val api: OpenMeteoApi = createDefaultOpenMeteoApi()
 ) {
 
+    suspend fun loadForecastForPlace(place: CityPlace): CityCatalogItem? = withContext(Dispatchers.IO) {
+        runCatching {
+            api.getForecast(place.latitude, place.longitude)
+        }.getOrNull()?.toCityCatalogItem(place)
+    }
+
     suspend fun loadAllCities(): WeatherLoadResult = withContext(Dispatchers.IO) {
         val offline = WeatherCatalog.offlineCities()
         coroutineScope {

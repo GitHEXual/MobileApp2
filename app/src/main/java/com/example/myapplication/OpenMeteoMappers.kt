@@ -139,7 +139,9 @@ fun OpenMeteoForecastResponse.toCityCatalogItem(place: CityPlace): CityCatalogIt
             sunset = formatClockFromIso(sunsetToday)
         ),
         mapPosition = place.mapPosition,
-        forecast = forecast
+        forecast = forecast,
+        latitude = place.latitude,
+        longitude = place.longitude
     )
 }
 

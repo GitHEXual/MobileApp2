@@ -75,7 +75,9 @@ object WeatherCatalog {
                 sunset = "17:32"
             ),
             mapPosition = places.first { it.id == HOME_CITY_ID }.mapPosition,
-            forecast = homeForecastOffline
+            forecast = homeForecastOffline,
+            latitude = places.first { it.id == HOME_CITY_ID }.latitude,
+            longitude = places.first { it.id == HOME_CITY_ID }.longitude
         ),
         CityCatalogItem(
             id = "saint-petersburg",
@@ -93,7 +95,9 @@ object WeatherCatalog {
                 sunrise = "08:15",
                 sunset = "17:10"
             ),
-            mapPosition = places.first { it.id == "saint-petersburg" }.mapPosition
+            mapPosition = places.first { it.id == "saint-petersburg" }.mapPosition,
+            latitude = places.first { it.id == "saint-petersburg" }.latitude,
+            longitude = places.first { it.id == "saint-petersburg" }.longitude
         ),
         CityCatalogItem(
             id = "kazan",
@@ -111,7 +115,9 @@ object WeatherCatalog {
                 sunrise = "07:50",
                 sunset = "17:25"
             ),
-            mapPosition = places.first { it.id == "kazan" }.mapPosition
+            mapPosition = places.first { it.id == "kazan" }.mapPosition,
+            latitude = places.first { it.id == "kazan" }.latitude,
+            longitude = places.first { it.id == "kazan" }.longitude
         ),
         CityCatalogItem(
             id = "sochi",
@@ -129,7 +135,9 @@ object WeatherCatalog {
                 sunrise = "07:20",
                 sunset = "18:05"
             ),
-            mapPosition = places.first { it.id == "sochi" }.mapPosition
+            mapPosition = places.first { it.id == "sochi" }.mapPosition,
+            latitude = places.first { it.id == "sochi" }.latitude,
+            longitude = places.first { it.id == "sochi" }.longitude
         )
     )
 
