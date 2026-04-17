@@ -163,6 +163,7 @@ fun WeatherApp(
                                 }
                             },
                             onOpenDetail = { cityId -> navController.navigate(AppRoutes.detail(cityId)) },
+                            onSelectHome = appViewModel::setHomeCityCatalog,
                             onDeleteFavorite = appViewModel::deleteFavorite,
                             onUpdateNote = appViewModel::updateFavoriteNote
                         )

@@ -146,10 +146,8 @@ private fun MapKeysSettingsBlock(
                                 Text(labels.mapKeysMakeActive)
                             }
                         }
-                        if (!row.isBuiltin) {
-                            TextButton(onClick = { onRemove(row.id) }) {
-                                Text(labels.mapKeysRemove, color = destructive)
-                            }
+                        TextButton(onClick = { onRemove(row.id) }) {
+                            Text(labels.mapKeysRemove, color = destructive)
                         }
                     }
                 }

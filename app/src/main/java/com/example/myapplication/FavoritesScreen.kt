@@ -11,14 +11,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.NoteAlt
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -29,8 +33,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -43,6 +47,7 @@ fun FavoritesScreen(
     isDark: Boolean,
     onBack: () -> Unit,
     onOpenDetail: (String) -> Unit,
+    onSelectHome: (String) -> Unit,
     onDeleteFavorite: (String) -> Unit,
     onUpdateNote: (String, String) -> Unit
 ) {
@@ -86,18 +91,57 @@ fun FavoritesScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 8.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 favorites.forEach { favorite ->
                     AppCard(isDark = isDark) {
-                        Column {
-                            Text(
-                                text = localizedCity(favorite.weather, language),
-                                fontWeight = FontWeight.Medium
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = localizedCity(favorite.weather, language),
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    IconButton(
+                                        onClick = { onSelectHome(favorite.cityId) },
+                                        modifier = Modifier.size(44.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Home,
+                                            contentDescription = labels.setAsHomeCity,
+                                            tint = bluePrimary
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { onOpenDetail(favorite.cityId) },
+                                        modifier = Modifier.size(44.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                            contentDescription = labels.details,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Text(
                                     text = signedTemperature(favorite.weather.temperature, suffix = "°C"),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -106,7 +150,10 @@ fun FavoritesScreen(
                                 Text(
                                     text = localizedCondition(favorite.weather, language),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 14.sp
+                                    fontSize = 14.sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
                                 )
                             }
                             if (!favorite.note.isNullOrBlank()) {
@@ -127,24 +174,21 @@ fun FavoritesScreen(
                                 MiniStat(labels.pressure, "${favorite.weather.pressure} hPa")
                             }
                             Spacer(modifier = Modifier.height(12.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                PrimaryActionButton(
-                                    modifier = Modifier.weight(1f),
-                                    text = labels.open,
-                                    onClick = { onOpenDetail(favorite.cityId) }
-                                )
-                                OutlineActionButton(
-                                    modifier = Modifier.weight(1f),
-                                    text = if (favorite.note.isNullOrBlank()) labels.addNote else labels.editNote,
-                                    icon = Icons.Default.NoteAlt,
-                                    onClick = { editTarget = favorite },
-                                    isDark = isDark
-                                )
-                            }
+                            OutlineActionButton(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp),
+                                text = if (favorite.note.isNullOrBlank()) labels.addNote else labels.editNote,
+                                icon = Icons.Default.NoteAlt,
+                                onClick = { editTarget = favorite },
+                                isDark = isDark
+                            )
                             Spacer(modifier = Modifier.height(8.dp))
                             OutlinedButton(
                                 onClick = { onDeleteFavorite(favorite.cityId) },
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
                                 shape = RoundedCornerShape(14.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = destructive),
                                 border = androidx.compose.foundation.BorderStroke(1.dp, destructive.copy(alpha = 0.2f))

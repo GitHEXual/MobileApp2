@@ -61,7 +61,7 @@ class WeatherAppViewModel(application: Application) : AndroidViewModel(applicati
             favorites = ltf.entities.mapNotNull { it.toFavoriteCity(cle.cities) },
             isLoading = cle.loading,
             networkErrorMessage = cle.err,
-            mapKeyRows = buildMapKeyRows(labels)
+            mapKeyRows = buildMapKeyRows()
         )
     }.stateIn(
         scope = viewModelScope,
@@ -77,19 +77,10 @@ class WeatherAppViewModel(application: Application) : AndroidViewModel(applicati
         refreshWeather()
     }
 
-    private fun buildMapKeyRows(labels: AppStrings): List<MapKeyRow> {
+    private fun buildMapKeyRows(): List<MapKeyRow> {
         val active = preferences.loadActiveMapKeyId()
-        val rows = mutableListOf(
+        return preferences.loadMapApiKeys().map { k ->
             MapKeyRow(
-                id = MapKitConfig.BUILTIN_KEY_ID,
-                displayName = labels.mapKeysBuiltinName,
-                maskedKey = maskMapApiKey(MapKitConfig.DEFAULT_API_KEY),
-                isBuiltin = true,
-                isActive = active == MapKitConfig.BUILTIN_KEY_ID
-            )
-        )
-        preferences.loadMapApiKeys().forEach { k ->
-            rows += MapKeyRow(
                 id = k.id,
                 displayName = k.displayName,
                 maskedKey = maskMapApiKey(k.apiKey),
@@ -97,7 +88,6 @@ class WeatherAppViewModel(application: Application) : AndroidViewModel(applicati
                 isActive = active == k.id
             )
         }
-        return rows
     }
 
     fun refreshWeather() {
