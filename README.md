@@ -32,3 +32,28 @@ Android-приложение для **просмотра прогноза пог
 ```bash
 ./gradlew :app:assembleDebugAndroidTest
 ```
+
+## Установка на смартфон через adb
+
+1. Включить на смартфоне:
+   - `Для разработчиков`
+   - `Отладка по USB`
+2. Подключить смартфон по USB и проверить, что устройство видно:
+
+```bash
+adb devices
+```
+
+В списке должно быть устройство со статусом `device`.
+
+3. Собрать debug APK:
+
+```bash
+./gradlew :app:assembleDebug
+```
+
+4. Установить APK на устройство:
+
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
