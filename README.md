@@ -12,6 +12,11 @@ Android-приложение для **просмотра прогноза пог
 - **JDK 17 или новее** — для **Gradle 9.3** и **Android Gradle Plugin 9.1**
 - **Android SDK**
 
+## Готовый debug APK в корне репозитория
+
+В корне лежит **`app-debug.apk`** (собранный `assembleDebug`). 
+
+
 ## Сборка debug APK через CLI
 
 Выполнять из корня проекта:
@@ -23,6 +28,7 @@ Android-приложение для **просмотра прогноза пог
 Собранный APK появится в пути:
 
 `app/build/outputs/apk/debug/app-debug.apk`
+
 
 ## Полезные команды
 
@@ -57,8 +63,8 @@ adb devices
 ./gradlew :app:assembleDebug
 ```
 
-4. Установить APK на устройство:
+4. Установить APK на устройство (из корня репозитория):
 
 ```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app-debug.apk
 ```

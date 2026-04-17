@@ -26,7 +26,6 @@ class WeatherRemoteRepository(
     }
 
     suspend fun loadAllCities(): WeatherLoadResult = withContext(Dispatchers.IO) {
-        val offline = WeatherCatalog.offlineCities()
         coroutineScope {
             val results = WeatherCatalog.places.map { place ->
                 async {
@@ -35,11 +34,11 @@ class WeatherRemoteRepository(
                     }.getOrNull()?.toCityCatalogItem(place)
                 }
             }.map { it.await() }
-            if (results.any { it == null }) {
-                WeatherLoadResult(offline, usedNetwork = false)
-            } else {
-                WeatherLoadResult(results.filterNotNull(), usedNetwork = true)
+            val merged = WeatherCatalog.places.zip(results).map { (place, remote) ->
+                remote ?: WeatherCatalog.fallbackCatalogItem(place)
             }
+            val usedNetwork = results.any { it != null }
+            WeatherLoadResult(merged, usedNetwork = usedNetwork)
         }
     }
 
@@ -63,6 +62,10 @@ class WeatherRemoteRepository(
                     ).distinct().joinToString(", ")
                     val title = if (suffix.isNotEmpty()) "$base ($suffix)" else base
                     GeocodingPlace(title = title, latitude = lat, longitude = lon)
+                }.distinctBy { p ->
+                    val latKey = (p.latitude * 10_000).toLong()
+                    val lonKey = (p.longitude * 10_000).toLong()
+                    "${latKey}_${lonKey}_${p.title}"
                 }
             }.getOrElse { emptyList() }
         }

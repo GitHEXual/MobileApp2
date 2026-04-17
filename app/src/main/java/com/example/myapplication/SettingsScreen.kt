@@ -9,9 +9,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 @Composable
 fun SettingsScreen(
@@ -69,6 +74,18 @@ fun SettingsScreen(
                             isDark = isDark
                         )
                     }
+                }
+            }
+
+            SettingsSection(title = labels.settingsSourcesTitle, icon = Icons.Outlined.Info) {
+                AppCard(isDark = isDark) {
+                    Text(
+                        text = labels.settingsSourcesFootnote,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 20.sp,
+                        fontWeight = FontWeight.Normal
+                    )
                 }
             }
         }

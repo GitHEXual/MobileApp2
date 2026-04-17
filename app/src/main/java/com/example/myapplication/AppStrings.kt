@@ -32,7 +32,8 @@ data class AppStrings(
     val light: String,
     val dark: String,
     val about: String,
-    val weatherData: String,
+    val settingsSourcesTitle: String,
+    val settingsSourcesFootnote: String,
     val openDetails: String,
     val noFavorites: String,
     val detailedInformation: String,
@@ -43,7 +44,6 @@ data class AppStrings(
     val setAsHomeCity: String,
     val mapSearchPlaceholder: String,
     val mapSearchResultHint: String,
-    val mapSearchGeocodingHint: String,
     val mapSearchNoResults: String
 )
 
@@ -79,7 +79,8 @@ val stringsRu = AppStrings(
     light = "Светлая",
     dark = "Тёмная",
     about = "О приложении",
-    weatherData = "Данные погоды — Open-Meteo",
+    settingsSourcesTitle = "Источники данных",
+    settingsSourcesFootnote = "Прогноз погоды: API Open-Meteo (forecast).\nКарта: osmdroid, тайлы OpenStreetMap.\nПоиск места по названию на карте: Open-Meteo Geocoding API.\nКоординаты городов каталога заданы в приложении и используются для запросов прогноза.",
     openDetails = "Перейти в детали",
     noFavorites = "Нет избранных городов",
     detailedInformation = "Подробная информация",
@@ -90,7 +91,6 @@ val stringsRu = AppStrings(
     setAsHomeCity = "Сделать домашним",
     mapSearchPlaceholder = "Поиск на карте",
     mapSearchResultHint = "Нажмите «Сделать домашним», чтобы показывать погоду этого города на главном экране.",
-    mapSearchGeocodingHint = "Поиск мест — Open-Meteo Geocoding (без ключа), как и прогноз погоды.",
     mapSearchNoResults = "Ничего не найдено — попробуйте другое название"
 )
 
@@ -126,7 +126,8 @@ val stringsEn = AppStrings(
     light = "Light",
     dark = "Dark",
     about = "About",
-    weatherData = "Weather data — Open-Meteo",
+    settingsSourcesTitle = "Data sources",
+    settingsSourcesFootnote = "Weather forecast: Open-Meteo API (forecast).\nMap: osmdroid library, OpenStreetMap tiles.\nMap place search by name: Open-Meteo Geocoding API.\nCatalog city coordinates are embedded in the app and used for forecast requests.",
     openDetails = "Open details",
     noFavorites = "No favorite cities",
     detailedInformation = "Detailed Information",
@@ -137,7 +138,6 @@ val stringsEn = AppStrings(
     setAsHomeCity = "Set as home city",
     mapSearchPlaceholder = "Search on map",
     mapSearchResultHint = "Tap «Set as home city» to show this city’s weather on the home screen.",
-    mapSearchGeocodingHint = "Place search uses Open-Meteo Geocoding (no API key), same stack as the forecast.",
     mapSearchNoResults = "Nothing found — try a different name"
 )
 
