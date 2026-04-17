@@ -133,11 +133,9 @@ fun WeatherApp(
                         MapScreen(
                             modifier = Modifier.fillMaxSize(),
                             cities = state.cities,
-                            favorites = state.favorites,
                             homeCityId = state.homeCityId,
                             labels = state.labels,
                             language = state.language,
-                            isDark = state.isDark,
                             searchMapPlaces = { q -> appViewModel.searchMapPlaces(q) },
                             onBack = {
                                 if (!navController.popBackStack()) {
@@ -145,7 +143,6 @@ fun WeatherApp(
                                 }
                             },
                             onOpenDetail = { cityId -> navController.navigate(AppRoutes.detail(cityId)) },
-                            onDeleteFavorite = appViewModel::deleteFavorite,
                             onSelectHomeCatalog = appViewModel::setHomeCityCatalog,
                             onSelectHomeCustom = appViewModel::setHomeCityCustom
                         )

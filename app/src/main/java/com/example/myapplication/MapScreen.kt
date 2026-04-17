@@ -1,10 +1,13 @@
 package com.example.myapplication
 
+import android.content.Context
+import android.graphics.drawable.Drawable
 import android.view.ViewGroup
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,13 +15,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,14 +44,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.launch
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
@@ -53,7 +63,6 @@ import org.osmdroid.views.overlay.Marker
 
 private sealed class MapSheetState {
     data class CatalogPick(val city: CityCatalogItem) : MapSheetState()
-    data class FavoritePick(val favorite: FavoriteCity) : MapSheetState()
     data class SearchPick(val place: GeocodingPlace) : MapSheetState()
 }
 
@@ -62,15 +71,12 @@ private sealed class MapSheetState {
 fun MapScreen(
     modifier: Modifier,
     cities: List<CityCatalogItem>,
-    favorites: List<FavoriteCity>,
     homeCityId: String,
     labels: AppStrings,
     language: AppLanguage,
-    isDark: Boolean,
     searchMapPlaces: suspend (String) -> List<GeocodingPlace>,
     onBack: () -> Unit,
     onOpenDetail: (String) -> Unit,
-    onDeleteFavorite: (String) -> Unit,
     onSelectHomeCatalog: (String) -> Unit,
     onSelectHomeCustom: (Double, Double, String, String) -> Unit
 ) {
@@ -80,7 +86,6 @@ fun MapScreen(
     var searchError by remember { mutableStateOf<String?>(null) }
     var searchLoading by remember { mutableStateOf(false) }
 
-    val favoritesById = remember(favorites) { favorites.associateBy(FavoriteCity::cityId) }
     val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
 
@@ -105,24 +110,51 @@ fun MapScreen(
             }
         )
         if (searchCandidates.isNotEmpty()) {
-            LazyColumn(
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 220.dp)
                     .padding(horizontal = 12.dp)
+                    .padding(bottom = 8.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
-                items(searchCandidates, key = { "${it.latitude}_${it.longitude}_${it.title}" }) { place ->
-                    OutlinedButton(
-                        onClick = {
-                            searchPin = place
-                            searchCandidates = emptyList()
-                            sheetState = MapSheetState.SearchPick(place)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                    ) {
-                        Text(place.title, style = MaterialTheme.typography.bodyMedium)
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 220.dp)
+                ) {
+                    itemsIndexed(
+                        searchCandidates,
+                        key = { _, p -> "${p.latitude}_${p.longitude}_${p.title}" }
+                    ) { index, place ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    searchPin = place
+                                    searchCandidates = emptyList()
+                                    sheetState = MapSheetState.SearchPick(place)
+                                }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(end = 12.dp)
+                            )
+                            Text(
+                                text = place.title,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        if (index < searchCandidates.lastIndex) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                            )
+                        }
                     }
                 }
             }
@@ -151,12 +183,7 @@ fun MapScreen(
             language = language,
             onCatalogMarkerTap = { cityId ->
                 val city = cities.firstOrNull { it.id == cityId } ?: return@OsmMapContent
-                val fav = favoritesById[cityId]
-                sheetState = if (fav != null) {
-                    MapSheetState.FavoritePick(fav)
-                } else {
-                    MapSheetState.CatalogPick(city)
-                }
+                sheetState = MapSheetState.CatalogPick(city)
             },
             onSearchMarkerTap = {
                 val pin = searchPin ?: return@OsmMapContent
@@ -173,6 +200,7 @@ fun MapScreen(
             when (val s = sheetState!!) {
                 is MapSheetState.CatalogPick -> MapCatalogSheet(
                     city = s.city,
+                    isHomeCity = s.city.id == homeCityId,
                     labels = labels,
                     language = language,
                     onSetHome = {
@@ -181,25 +209,6 @@ fun MapScreen(
                     },
                     onDetails = {
                         onOpenDetail(s.city.id)
-                        sheetState = null
-                    },
-                    onClose = { sheetState = null }
-                )
-                is MapSheetState.FavoritePick -> MapFavoriteSheet(
-                    favorite = s.favorite,
-                    labels = labels,
-                    language = language,
-                    isDark = isDark,
-                    onSetHome = {
-                        onSelectHomeCatalog(s.favorite.cityId)
-                        sheetState = null
-                    },
-                    onDetails = {
-                        onOpenDetail(s.favorite.cityId)
-                        sheetState = null
-                    },
-                    onDelete = {
-                        onDeleteFavorite(s.favorite.cityId)
                         sheetState = null
                     },
                     onClose = { sheetState = null }
@@ -226,6 +235,7 @@ fun MapScreen(
 @Composable
 private fun MapCatalogSheet(
     city: CityCatalogItem,
+    isHomeCity: Boolean,
     labels: AppStrings,
     language: AppLanguage,
     onSetHome: () -> Unit,
@@ -255,82 +265,17 @@ private fun MapCatalogSheet(
             fontWeight = FontWeight.Medium
         )
         Spacer(modifier = Modifier.height(8.dp))
-        Button(
-            onClick = onSetHome,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = bluePrimary)
-        ) {
-            Text(labels.setAsHomeCity)
+        if (!isHomeCity) {
+            Button(
+                onClick = onSetHome,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = bluePrimary)
+            ) {
+                Text(labels.setAsHomeCity)
+            }
         }
         OutlinedButton(onClick = onDetails, modifier = Modifier.fillMaxWidth()) {
             Text(labels.details)
-        }
-        OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
-            Text(labels.close)
-        }
-    }
-}
-
-@Composable
-private fun MapFavoriteSheet(
-    favorite: FavoriteCity,
-    labels: AppStrings,
-    language: AppLanguage,
-    isDark: Boolean,
-    onSetHome: () -> Unit,
-    onDetails: () -> Unit,
-    onDelete: () -> Unit,
-    onClose: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp)
-            .padding(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text(
-            text = localizedCity(favorite.weather, language),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold
-        )
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = signedTemperature(favorite.weather.temperature, suffix = "°C"),
-                fontSize = 36.sp,
-                fontWeight = FontWeight.Light
-            )
-            Text(
-                text = localizedCondition(favorite.weather, language),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        if (!favorite.note.isNullOrBlank()) {
-            NotePreviewCard(
-                note = favorite.note,
-                label = labels.noteLabel,
-                isDark = isDark,
-                italic = true
-            )
-        }
-        Button(
-            onClick = onSetHome,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = bluePrimary)
-        ) {
-            Text(labels.setAsHomeCity)
-        }
-        OutlinedButton(onClick = onDetails, modifier = Modifier.fillMaxWidth()) {
-            Text(labels.openDetails)
-        }
-        OutlinedButton(
-            onClick = onDelete,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(labels.delete, color = destructive)
         }
         OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
             Text(labels.close)
@@ -412,6 +357,16 @@ private fun MapSearchBar(
     }
 }
 
+private fun pinDrawable(context: Context, colorArgb: Int, scale: Float): Drawable? {
+    val base = ContextCompat.getDrawable(context, org.osmdroid.library.R.drawable.marker_default)?.mutate()
+        ?: return null
+    base.setTint(colorArgb)
+    val w = (base.intrinsicWidth * scale).toInt().coerceAtLeast(8)
+    val h = (base.intrinsicHeight * scale).toInt().coerceAtLeast(8)
+    base.setBounds(0, 0, w, h)
+    return base
+}
+
 @Composable
 private fun OsmMapContent(
     modifier: Modifier,
@@ -424,6 +379,7 @@ private fun OsmMapContent(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val blueArgb = bluePrimary.toArgb()
     val mapView = remember {
         MapView(context).apply {
             layoutParams = ViewGroup.LayoutParams(
@@ -434,6 +390,9 @@ private fun OsmMapContent(
             setTileSource(TileSourceFactory.MAPNIK)
             minZoomLevel = 3.0
             maxZoomLevel = 19.0
+            isTilesScaledToDpi = true
+            setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
+            clipToOutline = true
         }
     }
 
@@ -455,14 +414,22 @@ private fun OsmMapContent(
         }
     }
 
-    LaunchedEffect(cities, homeCityId, searchPin, language) {
+    LaunchedEffect(cities, homeCityId, searchPin, language, blueArgb) {
         mapView.overlays.removeAll { it is Marker }
+        val catalogScaleOther = 0.62f
         cities.forEach { city ->
+            val isHome = city.id == homeCityId
+            val icon = pinDrawable(
+                context,
+                if (isHome) android.graphics.Color.RED else blueArgb,
+                if (isHome) 1f else catalogScaleOther
+            ) ?: return@forEach
             val marker = Marker(mapView).apply {
                 position = GeoPoint(city.latitude, city.longitude)
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                 title = localizedCity(city.weather, language)
                 relatedObject = city.id
+                this.icon = icon
                 setOnMarkerClickListener { m, _ ->
                     val id = m.relatedObject as? String ?: return@setOnMarkerClickListener false
                     onCatalogMarkerTap(id)
@@ -472,11 +439,13 @@ private fun OsmMapContent(
             mapView.overlays.add(marker)
         }
         searchPin?.let { pin ->
+            val icon = pinDrawable(context, blueArgb, catalogScaleOther) ?: return@let
             val marker = Marker(mapView).apply {
                 position = GeoPoint(pin.latitude, pin.longitude)
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                 title = pin.title
                 relatedObject = "search"
+                this.icon = icon
                 setOnMarkerClickListener { _, _ ->
                     onSearchMarkerTap()
                     true
@@ -497,11 +466,10 @@ private fun OsmMapContent(
             focusHome != null -> 6.0
             else -> 4.5
         }
-        mapView.controller.setZoom(zoom)
-        mapView.controller.setCenter(gp)
+        mapView.controller.animateTo(gp, zoom, 1000L)
     }
 
-    Box(modifier = modifier) {
+    Box(modifier = modifier.clipToBounds()) {
         AndroidView(
             factory = { mapView },
             modifier = Modifier.fillMaxSize()
