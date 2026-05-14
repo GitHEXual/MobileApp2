@@ -2,11 +2,6 @@
 
 Android-приложение для **просмотра прогноза погоды** с отдельными экранами, локальным хранением избранных городов и заметок в `Room`, картой (OpenStreetMap), избранным и настройками.
 
-## Карта и геокодинг (без ключей API)
-
-- **Тайлы карты**: [osmdroid](https://github.com/osmdroid/osmdroid) и тайлы OpenStreetMap (например Mapnik), ключ не требуется.
-- **Поиск места на карте** и **координаты для произвольного «домашнего» города**: [Open-Meteo Geocoding API](https://open-meteo.com/en/docs/geocoding-api) — тот же стек, что и **прогноз погоды** (Open-Meteo Forecast), без API-ключа.
-
 ## Требования
 
 - **JDK 17 или новее** — для **Gradle 9.3** и **Android Gradle Plugin 9.1**
